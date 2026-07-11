@@ -8,3 +8,10 @@ pytest
 fastapi
 uvicorn
 pydantic
+
+# sql
+sqlalchemy
+psycopg2-binary
+
+#env
+python-dotenv
