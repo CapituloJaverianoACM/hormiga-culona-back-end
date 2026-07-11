@@ -1,7 +1,6 @@
 # Here goes fastapi ports and init
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends ,WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-
 
 # Importar los eschemas
 from schemas.message import MessagePayload, MessageResponse
@@ -35,3 +34,15 @@ def chat(
     )
     
     return resultado
+
+
+@app.websocket("ws/agent/{clientID}")
+async def websocketAgentEndpoint(
+    websocket: WebSocket,
+    clientID: str,
+    orchestrator: AgentOrchestratorService = Depends() 
+):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_bytes()
