@@ -13,5 +13,8 @@ pydantic
 sqlalchemy
 psycopg2-binary
 
+#event
+apscheduler
+
 #env
 python-dotenv

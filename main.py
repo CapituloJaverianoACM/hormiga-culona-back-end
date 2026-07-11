@@ -1,4 +1,5 @@
-# Here goes fastapi ports and init
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Depends ,WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,11 +10,43 @@ from schemas.database import QueryPayload
 # Importar los servicios
 from services.orchestrator import AgentOrchestratorService
 from services.database import AgentDatabaseService
+from services.schema import SchemaCacheService
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+schema_service = SchemaCacheService()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """ Gestor del ciclo de vida del servidor (Startup / Shutdown) """
+    
+    # 1. Ejecutamos la carga inicial inmediatamente antes de recibir tráfico
+    schema_service.refresh_schema_sync()
+    
+    # 2. Configuramos y arrancamos el Cron Job
+    scheduler = AsyncIOScheduler()
+    
+    # Programamos la tarea para que corra cada 1 hora (3600 segundos) exactos
+    scheduler.add_job(
+        schema_service.refresh_schema_sync, 
+        trigger='interval', 
+        hours=1,
+        id='update_db_schema_job',
+        replace_existing=True
+    )
+    scheduler.start()
+    print("[INFO] Planificador CRON iniciado correctamente.")
+    
+    yield # Aquí FastAPI comienza a aceptar peticiones HTTP
+    
+    scheduler.shutdown()
+    print("[INFO] Planificador CRON detenido.")
 
 app = FastAPI(
     title="Hormiga Culona APIII",
     description="Backend para el empalme entre el front y el agente",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Despues se añadira el CORS si desplegamos
@@ -60,53 +93,8 @@ def execute_agent_sql(
     }
 
 @app.get("/agent/description")
-def getDatabaseSchema():
-    schema_metadata = {
-        "database_name": "Base de datos financiera (Supabase)",
-        "tables": {
-            "ingresos": [
-                "id", 
-                "anio", 
-                "periodo", 
-                "codigo_fut", 
-                "codigo_fut_normalizado", 
-                "descripcion", 
-                "presupuesto_inicial", 
-                "adiciones", 
-                "reducciones", 
-                "creditos", 
-                "contracreditos", 
-                "presupuesto_final", 
-                "recaudos", 
-                "recaudo_acumulado", 
-                "saldo_por_recaudar", 
-                "pct_ejecucion"
-            ],
-            "egresos": [
-                "id", 
-                "anio", 
-                "periodo", 
-                "codigo_rubro", 
-                "codigo_rubro_normalizado", 
-                "descripcion_rubro", 
-                "presupuesto_inicial", 
-                "adiciones", 
-                "reducciones", 
-                "creditos", 
-                "contracreditos", 
-                "presupuesto_definitivo", 
-                "disponibilidad_acumulada", 
-                "compromiso_acumulado", 
-                "obligaciones", 
-                "pagos_acumulados", 
-                "extra_1", 
-                "saldo_reservas", 
-                "pct_ejecucion"
-            ]
-        }
-    }
-    
-    return schema_metadata
+def get_database_schema():
+    return schema_service.get_cache()
 
 @app.websocket("/ws/agent/voice/{session_id}")
 async def direct_voice_agent(
