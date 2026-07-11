@@ -1,4 +1,10 @@
-fastapi
+# agents
 agent-framework
 python-dotenv
+asyncio
 pytest
+
+# apis
+fastapi
+uvicorn
+pydantic
