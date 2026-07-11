@@ -2,3 +2,4 @@ fastapi
 agent-framework
 uvicorn
 pydantic
+asyncio

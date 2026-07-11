@@ -36,13 +36,24 @@ def chat(
     return resultado
 
 
-@app.websocket("ws/agent/{clientID}")
-async def websocketAgentEndpoint(
+@app.websocket("/ws/agent/voice/{session_id}")
+async def direct_voice_agent(
     websocket: WebSocket,
-    clientID: str,
-    orchestrator: AgentOrchestratorService = Depends() 
+    session_id: str,
+    agent: AgentOrchestratorService = Depends() 
 ):
+
     await websocket.accept()
+    print(f"Sesión de voz {session_id} iniciada.")
+    
     try:
         while True:
-            data = await websocket.receive_bytes()
+            user_audio_bytes = await websocket.receive_bytes()
+            
+            agent_audio_bytes = await agent.process_audio_stream(user_audio_bytes)
+            
+            # Transmisión: Enviamos los bytes de voz del agente de vuelta al cliente
+            await websocket.send_bytes(agent_audio_bytes)
+            
+    except WebSocketDisconnect:
+        print(f"Sesión de voz {session_id} finalizada.")
