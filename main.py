@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Importar los eschemas
 from schemas.message import MessagePayload
 from schemas.database import QueryPayload
+
 # Importar los servicios
 from services.orchestrator import AgentOrchestratorService
 from services.database import AgentDatabaseService
@@ -45,6 +46,7 @@ def execute_agent_sql(
     Endpoint que actúa como herramienta para que el agente ejecute SQL en la base de datos.
     Recibe la consulta validada a través del DTO y retorna los resultados.
     """
+
     # 1. Extraemos la cadena SQL del body validado
     query_string = payload.sql_query
     
@@ -56,6 +58,55 @@ def execute_agent_sql(
         "status": "success",
         "data": resultado
     }
+
+@app.get("/agent/description")
+def getDatabaseSchema():
+    schema_metadata = {
+        "database_name": "Base de datos financiera (Supabase)",
+        "tables": {
+            "ingresos": [
+                "id", 
+                "anio", 
+                "periodo", 
+                "codigo_fut", 
+                "codigo_fut_normalizado", 
+                "descripcion", 
+                "presupuesto_inicial", 
+                "adiciones", 
+                "reducciones", 
+                "creditos", 
+                "contracreditos", 
+                "presupuesto_final", 
+                "recaudos", 
+                "recaudo_acumulado", 
+                "saldo_por_recaudar", 
+                "pct_ejecucion"
+            ],
+            "egresos": [
+                "id", 
+                "anio", 
+                "periodo", 
+                "codigo_rubro", 
+                "codigo_rubro_normalizado", 
+                "descripcion_rubro", 
+                "presupuesto_inicial", 
+                "adiciones", 
+                "reducciones", 
+                "creditos", 
+                "contracreditos", 
+                "presupuesto_definitivo", 
+                "disponibilidad_acumulada", 
+                "compromiso_acumulado", 
+                "obligaciones", 
+                "pagos_acumulados", 
+                "extra_1", 
+                "saldo_reservas", 
+                "pct_ejecucion"
+            ]
+        }
+    }
+    
+    return schema_metadata
 
 @app.websocket("/ws/agent/voice/{session_id}")
 async def direct_voice_agent(
@@ -78,3 +129,6 @@ async def direct_voice_agent(
             
     except WebSocketDisconnect:
         print(f"Sesión de voz {session_id} finalizada.")
+
+
+
