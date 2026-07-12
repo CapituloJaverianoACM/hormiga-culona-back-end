@@ -3,8 +3,8 @@ from agent_framework_openai import OpenAIChatClient
 from AI.agents.base_agent import BaseAgent
 
 class ResponseAgent(BaseAgent):
-    name: str
-    instructions: str
+    name = "Response Agent"
+    instructions = "You are a helpful assistant that provides responses to user queries."
     agent: Agent
     async def create_agent(self, OpenAiClient: OpenAIChatClient):
         self.agent = Agent(
@@ -14,5 +14,6 @@ class ResponseAgent(BaseAgent):
         )
 
     async def run_agent(self, prompt: str):
-        response = await self.agent.run(prompt)
+        complete_response = await self.agent.run(prompt)
+        response = complete_response.text
         return response

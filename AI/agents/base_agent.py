@@ -3,6 +3,7 @@ from agent_framework import Agent
 from AI.open_ai_client import OpenAiClient
 
 class BaseAgent(ABC):
+    """Abstract base class for agents that interact with the OpenAI API."""
     @abstractmethod
     async def create_agent(self, OpenAiClient: OpenAiClient, name :str, instructions: str):
         pass

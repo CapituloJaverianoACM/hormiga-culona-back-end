@@ -3,6 +3,7 @@ from AI.open_ai_client import OpenAiClient
 from AI.agents.base_agent import BaseAgent
 
 class mockAgent(BaseAgent):
+    """A mock agent for testing purposes."""
     name: str
     instructions: str
     agent: Agent

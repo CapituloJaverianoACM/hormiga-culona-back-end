@@ -6,6 +6,7 @@ from agent_framework_openai import OpenAIChatClient
 
 class OpenAiClient(OpenAIChatClient):
     def __init__(self):
+        """Initialize the OpenAiClient with environment variables."""
         dotenv.load_dotenv()
         self.base_url = os.getenv("FOUNDRY_PROJECT_ENDPOINT")
         self.model = os.getenv("FOUNDRY_MODEL_DEPLOYMENT_NAME")
