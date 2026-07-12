@@ -9,7 +9,14 @@ from services.schema import SchemaCacheService
 
 
 class AgentOrchestratorService:
+    """
+    AgentOrchestratorService is responsible for orchestrating 
+    the interactions between the query agent, UI agent, and database service.    
+    """
     def __init__(self):
+        """
+        Initializes the orchestrator service, setting up the OpenAI client, query agent, UI agent, database service, and schema service.
+        """
         self.open_ai_client = OpenAiClient()
         self.query_agent = queryAgent()
         self.ui_agent = UIAgent()

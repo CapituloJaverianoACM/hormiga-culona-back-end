@@ -85,22 +85,9 @@ def execute_agent_sql(
         "data": resultado
     }
 
-
-@app.post("/agent/sql/preview")
-def execute_agent_sql_preview(
-    payload: SQLPreviewPayload,
-    db_service: AgentDatabaseService = Depends()
-):
-    resultado = db_service.execute_preview_query(payload.sql_query, payload.limit)
-    return {
-        "status": "success",
-        "data": resultado
-    }
-
 @app.get("/agent/description")
 def get_database_schema():
     return schema_service.get_cache()
-
 
 @app.post("/agent/ui")
 def build_agent_ui(

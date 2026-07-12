@@ -6,6 +6,9 @@ from schemas.ui import UIPlan
 
 
 class UIAgent(BaseAgent):
+    """"
+    UIAgent is an agent that translates user requests into frontend query plans to 
+    display data in a user interface. It generates SQL queries and provides metadata for rendering the results."""
     name = "UI Agent"
     instructions = """
     Eres un asistente que traduce solicitudes del usuario a planes de consulta para frontend.
@@ -13,7 +16,6 @@ class UIAgent(BaseAgent):
     Reglas:
     - Genera una sola consulta SQL de lectura.
     - Usa únicamente tablas y columnas del esquema entregado.
-    - Prefiere consultas simples para un hackathon.
     - component debe ser uno de: table, bar_chart, line_chart, card, list.
     - title debe ser corto y claro.
     - summary debe describir qué verá el frontend.
