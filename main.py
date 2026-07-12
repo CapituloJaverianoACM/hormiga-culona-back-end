@@ -60,9 +60,8 @@ def healthMonitor():
 @app.post("/agent/chat")
 def chat(
     payload: MessagePayload, 
-    orchestrator: AgentOrchestratorService = Depends() 
+    orchestrator: AgentOrchestratorService = Depends()
 ):
-
     resultado = orchestrator.processMessage(
         content=payload.content, 
         chatId=payload.sender_id
