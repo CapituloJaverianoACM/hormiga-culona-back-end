@@ -1,11 +1,11 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends ,WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
 
 # Importar los eschemas
 from schemas.message import MessagePayload
-from schemas.database import QueryPayload
+from schemas.database import QueryPayload, SQLPreviewPayload
+from schemas.ui import UIRequestPayload
 
 # Importar los servicios
 from services.orchestrator import AgentOrchestratorService
@@ -71,21 +71,15 @@ def chat(
 
 @app.post("/agent/sql")
 def execute_agent_sql(
-    payload: QueryPayload, 
-    db_service: AgentDatabaseService = Depends() 
+    payload: QueryPayload,
+    db_service: AgentDatabaseService = Depends()
 ):
     """
     Endpoint que actúa como herramienta para que el agente ejecute SQL en la base de datos.
     Recibe la consulta validada a través del DTO y retorna los resultados.
     """
 
-    # 1. Extraemos la cadena SQL del body validado
-    query_string = payload.sql_query
-    
-    # 2. Delegamos la ejecución transaccional al servicio de base de datos
-    resultado = db_service.execute_read_only_query(query_string)
-    
-    # 3. Retornamos la respuesta serializada al agente
+    resultado = db_service.execute_read_only_query(payload.sql_query)
     return {
         "status": "success",
         "data": resultado
@@ -94,6 +88,13 @@ def execute_agent_sql(
 @app.get("/agent/description")
 def get_database_schema():
     return schema_service.get_cache()
+
+@app.post("/agent/ui")
+def build_agent_ui(
+    payload: UIRequestPayload,
+    orchestrator: AgentOrchestratorService = Depends()
+):
+    return orchestrator.build_ui_data(payload.content, payload.preview_limit)
 
 @app.websocket("/ws/agent/voice/{session_id}")
 async def direct_voice_agent(
