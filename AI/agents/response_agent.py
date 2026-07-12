@@ -4,7 +4,9 @@ from AI.agents.base_agent import BaseAgent
 
 class ResponseAgent(BaseAgent):
     name = "Response Agent"
-    instructions = "You are a helpful assistant that provides responses to user queries."
+    instructions = """
+    Eres un asistente de IA que responde la pregunta del usuario basandose en la informacion proporcionada 
+    por la query SQL ejecutada por el queryAgent.""" 
     agent: Agent
     async def create_agent(self, OpenAiClient: OpenAIChatClient):
         self.agent = Agent(

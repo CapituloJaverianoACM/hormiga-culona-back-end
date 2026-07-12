@@ -8,6 +8,7 @@ pytest
 fastapi
 uvicorn
 pydantic
+requests
 
 # sql
 sqlalchemy
