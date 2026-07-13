@@ -1,4 +1,15 @@
-fastapi
 agent-framework
+agent-framework-openai
+python-dotenv
+pytest
+azure-ai-transcription
+fastapi
 uvicorn
 pydantic
+requests
+matplotlib
+python-multipart
+sqlalchemy
+psycopg2-binary
+apscheduler
+websockets
