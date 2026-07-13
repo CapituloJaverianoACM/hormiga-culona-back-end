@@ -41,7 +41,7 @@ class UIAgent(BaseAgent):
         )
 
     async def run_agent(self, prompt: str) -> UIPlan:
-        response = await self.agent.run(prompt, options={"response_format": UIPlan})
+        response = await self.agent.run(self.inject_prompt(prompt), options={"response_format": UIPlan})
         if response.value:
             return response.value
         raise ValueError(f"No se pudo parsear el plan UI: {response.text}")
