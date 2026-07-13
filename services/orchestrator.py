@@ -153,6 +153,8 @@ class AgentOrchestratorService:
                 "Muestra pequeña del resultado:",
                 json.dumps(sample_rows, ensure_ascii=False),
                 "Explica el hallazgo principal sin listar toda la base ni repetir filas completas.",
+                "Usa español claro y accesible para cualquier persona.",
+                "No uses notación matemática, LaTeX, fórmulas ni símbolos especiales.",
                 "No menciones JSON en voice_reply; la respuesta de audio debe entenderse sola.",
             ]
         )

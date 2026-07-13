@@ -180,6 +180,7 @@ async def direct_voice_agent(
                     user_audio_bytes,
                     mode=mode,
                     preview_limit=preview_limit,
+                    chat_id=session_id,
                 )
             else:
                 result = await agent.process_text_request(
