@@ -13,3 +13,4 @@ sqlalchemy
 psycopg2-binary
 apscheduler
 websockets
+azure-ai-transcription
