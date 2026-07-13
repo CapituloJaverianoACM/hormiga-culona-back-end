@@ -1,22 +1,15 @@
-# agents
 agent-framework
+agent-framework-openai
 python-dotenv
-asyncio
 pytest
-
-# apis
+azure-ai-transcription
 fastapi
 uvicorn
 pydantic
 requests
 matplotlib
-
-# sql
+python-multipart
 sqlalchemy
 psycopg2-binary
-
-#event
 apscheduler
-
-#env
-python-dotenv
+websockets
