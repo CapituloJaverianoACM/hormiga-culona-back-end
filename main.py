@@ -1,8 +1,13 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends ,WebSocket, WebSocketDisconnect
+import json
+
+from fastapi import FastAPI, Depends, File, UploadFile, WebSocket, WebSocketDisconnect, HTTPException, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import Response
 
 # Importar los eschemas
+from schemas.audio import SpeechSynthesisPayload
 from schemas.message import MessagePayload
 from schemas.database import QueryPayload, SQLPreviewPayload
 from schemas.ui import UIRequestPayload
@@ -80,6 +85,12 @@ def execute_agent_sql(
     """
 
     resultado = db_service.execute_read_only_query(payload.sql_query)
+    if resultado and isinstance(resultado[0], dict) and "error" in resultado[0]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=resultado[0]["error"],
+        )
+
     return {
         "status": "success",
         "data": resultado
@@ -96,27 +107,129 @@ def build_agent_ui(
 ):
     return orchestrator.build_ui_data(payload.content, payload.preview_limit)
 
+
+@app.post("/agent/audio/synthesis")
+def synthesize_audio(
+    payload: SpeechSynthesisPayload,
+    orchestrator: AgentOrchestratorService = Depends(),
+):
+    audio_bytes = orchestrator.synthesize_audio(payload.text)
+    return Response(content=audio_bytes, media_type="audio/wav")
+
+
+@app.post("/agent/audio/transcription")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    orchestrator: AgentOrchestratorService = Depends(),
+):
+    audio_bytes = await file.read()
+    return {
+        "text": orchestrator.transcribe_audio(
+            audio_bytes,
+            file.filename or "audio.wav",
+            file.content_type or "audio/wav",
+        ),
+        "filename": file.filename,
+        "content_type": file.content_type,
+    }
+
+
 @app.websocket("/ws/agent/voice/{session_id}")
 async def direct_voice_agent(
     websocket: WebSocket,
     session_id: str,
-    agent: AgentOrchestratorService = Depends() 
+    agent: AgentOrchestratorService = Depends()
 ):
-
     await websocket.accept()
     print(f"Sesión de voz {session_id} iniciada.")
-    
+
+    mode = str(websocket.query_params.get("mode") or "response").strip().lower()
+    if mode not in {"response", "ui"}:
+        mode = "response"
+
+    output_mode = str(websocket.query_params.get("output") or "both").strip().lower()
+    if output_mode not in {"audio", "json", "both"}:
+        output_mode = "both"
+
     try:
-        while True:
-            user_audio_bytes = await websocket.receive_bytes()
-            
-            agent_audio_bytes = await agent.process_audio_stream(user_audio_bytes)
-            
-            # Transmisión: Enviamos los bytes de voz del agente de vuelta al cliente
-            await websocket.send_bytes(agent_audio_bytes)
-            
-    except WebSocketDisconnect:
-        print(f"Sesión de voz {session_id} finalizada.")
+        preview_limit = int(websocket.query_params.get("preview_limit", "5"))
+    except ValueError:
+        preview_limit = 5
+    preview_limit = max(1, min(preview_limit, 20))
 
+    while True:
+        try:
+            message = await websocket.receive()
+        except (WebSocketDisconnect, RuntimeError):
+            print(f"Sesión de voz {session_id} finalizada.")
+            break
 
+        if message.get("type") == "websocket.disconnect":
+            print(f"Sesión de voz {session_id} finalizada.")
+            break
 
+        user_text = (message.get("text") or "").strip()
+        user_audio_bytes = message.get("bytes")
+
+        if not user_text and user_audio_bytes is None:
+            continue
+
+        try:
+            if user_audio_bytes is not None:
+                result = await agent.process_audio_request(
+                    user_audio_bytes,
+                    mode=mode,
+                    preview_limit=preview_limit,
+                )
+            else:
+                result = await agent.process_text_request(
+                    user_text,
+                    chat_id=session_id,
+                    mode=mode,
+                    preview_limit=preview_limit,
+                )
+
+            response_payload = {
+                "type": "agent_result",
+                "mode": result["mode"],
+                "user_text": result["user_text"],
+                "voice_reply": result["voice_reply"],
+                "explanation": result["explanation"],
+                "data": result["data"],
+            }
+            if response_payload["mode"] != "ui" and isinstance(response_payload["data"], dict):
+                response_payload["data"].pop("rows", None)
+            agent_audio_bytes = None
+            if output_mode in {"audio", "both"}:
+                agent_audio_bytes = agent.synthesize_audio(result["voice_reply"])
+        except Exception as exc:
+            voice_reply = "No pude procesar la solicitud."
+            error_text = f"{voice_reply} {exc}".strip()
+            response_payload = {
+                "type": "agent_result",
+                "mode": mode,
+                "user_text": user_text,
+                "voice_reply": voice_reply,
+                "explanation": error_text,
+                "data": {
+                    "summary": "Ocurrió un error.",
+                    "explanation": error_text,
+                    "voice_reply": voice_reply,
+                    "preview_rows": [],
+                    "columns": [],
+                    "row_count": 0,
+                },
+            }
+            agent_audio_bytes = None
+            if output_mode in {"audio", "both"}:
+                agent_audio_bytes = agent.synthesize_audio(voice_reply)
+
+        try:
+            safe_payload = jsonable_encoder(response_payload)
+            if output_mode in {"json", "both"}:
+                await websocket.send_text(json.dumps(safe_payload, ensure_ascii=False))
+            if output_mode in {"audio", "both"} and agent_audio_bytes is not None:
+                await websocket.send_bytes(agent_audio_bytes)
+        except (WebSocketDisconnect, RuntimeError):
+            print(f"Sesión de voz {session_id} finalizada.")
+            break

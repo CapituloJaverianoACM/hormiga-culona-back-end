@@ -1,20 +1,13 @@
-import os
 import asyncio
-from dotenv import load_dotenv
+
 from AI.agents.mock_agent import mockAgent
-from AI.open_ai_client import OpenAiClient
 
-load_dotenv()
 
-# Create an instance of OpenAiClient
-open_ai_client = OpenAiClient()
+def test_mock_agent():
+    async def _run():
+        mock_agent = mockAgent()
+        await mock_agent.create_agent()
+        response = await mock_agent.run_agent("test")
+        assert response == "This is a mock response from the mock agent."
 
-# Create an instance of mockAgent
-agent_name = "Mock Agent"
-agent_instructions = "This is a mock agent for testing purposes."
-mock_agent = mockAgent()
-asyncio.run(mock_agent.create_agent())
-
-# Run the mock agent and print the response
-response = asyncio.run(mock_agent.run_agent("test"))
-print(response)
+    asyncio.run(_run())

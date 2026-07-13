@@ -1,4 +1,4 @@
-from scripts.database_squema import sql_schema
+from scripts.database_schema import sql_schema
 
 def test_sql_schema():
     # Call the function to get the SQL schema

@@ -18,7 +18,8 @@ class UIAgent(BaseAgent):
     - Usa únicamente tablas y columnas del esquema entregado.
     - component debe ser uno de: table, bar_chart, line_chart, card, list.
     - title debe ser corto y claro.
-    - summary debe describir qué verá el frontend.
+    - summary debe ser UNA sola oración corta, máximo 18 palabras.
+    - summary solo describe qué verá el frontend; no incluyas resultados, números, recomendaciones, SQL, análisis ni contexto extra.
     - Si una métrica monetaria viene como texto, antes de convertirla usa este patrón:
       NULLIF(regexp_replace(columna_texto, '[^0-9.-]', '', 'g'), '')::numeric
     - Para reportes graficables, devuelve una dimensión categórica o temporal y una métrica numérica agregada.
