@@ -1,10 +1,9 @@
-import os
+import argparse
 import csv
 import glob
+import os
 import re
-import chardet
-
-BASE_DIR = "."
+from pathlib import Path
 
 PATRON_EGRESOS = "RESUMEN_EGRESOS_PRESUPUESTO_GENERAL_DEL_MUNICIPIO_DE_BUCARAMANGA_*.csv"
 PATRON_INGRESOS = "RESUMEN_INGRESOS_PRESUPUESTO_GENERAL_DE_BUCARAMANGA_*.csv"
@@ -77,15 +76,20 @@ def detectar_marcador_semestre(texto):
 def detectar_encoding(path):
     with open(path, "rb") as f:
         raw = f.read(20000)
-    guess = chardet.detect(raw)
-    return guess["encoding"] or "utf-8"
+    for encoding in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+        try:
+            raw.decode(encoding)
+            return encoding
+        except UnicodeDecodeError:
+            continue
+    return "latin-1"
 
 
-def encontrar_archivo(patron):
-    candidatos = sorted(glob.glob(os.path.join(BASE_DIR, patron)))
+def encontrar_archivo(base_dir, patron):
+    candidatos = sorted(glob.glob(os.path.join(str(base_dir), patron)))
     if not candidatos:
         raise FileNotFoundError(
-            f"No se encontro ningun archivo que coincida con '{patron}' en {BASE_DIR}."
+            f"No se encontro ningun archivo que coincida con '{patron}' en {base_dir}."
         )
     # Si hay varias exportaciones (distintas fechas en el nombre), se toma la mas
     # reciente; el sufijo de fecha AAAAMMDD ordena bien alfabeticamente.
@@ -143,7 +147,7 @@ def procesar_archivo(path, mapeo, prefijo_id, log_validacion):
     filas_del_bloque_actual = 0
 
     def cerrar_bloque_si_existe():
-        if bloque_iniciado and filas_del_bloque_actual >= 0:
+        if bloque_iniciado:
             resumen_bloques.append((anio_actual, periodo_actual, filas_del_bloque_actual))
 
     with open(path, "r", encoding=encoding, errors="replace", newline="") as f:
@@ -180,21 +184,22 @@ def procesar_archivo(path, mapeo, prefijo_id, log_validacion):
                 if campo is None:
                     continue  # columna sin valor analitico, se descarta
                 valor_crudo = row[idx]
-                if campo in CAMPOS_TEXTO:
-                    fila_dict[campo] = valor_crudo.strip()
-                else:
-                    fila_dict[campo] = limpiar_valor(valor_crudo)
+                fila_dict[campo] = valor_crudo.strip() if campo in CAMPOS_TEXTO else limpiar_valor(valor_crudo)
 
+            desc_val = (fila_dict.get("descripcion_rubro") or fila_dict.get("descripcion") or "").strip().upper()
             if en_zona_basura:
-                desc_val = (fila_dict.get("descripcion_rubro") or fila_dict.get("descripcion") or "").strip().upper()
                 if desc_val in ("", "NO APLICA"):
                     filas_basura_saltadas += 1
-                    continue  # sigue siendo fila de leyenda/relleno, descartar
-                en_zona_basura = False  # primera fila real del bloque (aunque venga con -88 en los montos, es legitima)
+                    continue
+                en_zona_basura = False
+
+            if desc_val in {"DESCRIPCION RUBRO", "DESCRIPCION", "RUBRO"}:
+                filas_basura_saltadas += 1
+                continue
 
             seq_en_bloque += 1
             filas_del_bloque_actual += 1
-            fila_dict["id"] = f"{prefijo_id}-{anio_actual}-{periodo_actual}-{seq_en_bloque:05d}"
+            fila_dict["id"] = f"{prefijo_id}-{anio_actual}-{periodo_actual}-{len(resumen_bloques) + 1:02d}-{seq_en_bloque:05d}"
             fila_dict["anio"] = anio_actual
             fila_dict["periodo"] = periodo_actual
             fila_dict["archivo_origen"] = nombre
@@ -219,40 +224,70 @@ def procesar_archivo(path, mapeo, prefijo_id, log_validacion):
     return filas_salida
 
 
-def consolidar(patron_archivo, mapeo, prefijo_id, nombre_salida, log_validacion):
-    path = encontrar_archivo(patron_archivo)
+def consolidar(input_dir, patron_archivo, mapeo, prefijo_id, nombre_salida, log_validacion, output_dir):
+    path = encontrar_archivo(input_dir, patron_archivo)
     filas = procesar_archivo(path, mapeo, prefijo_id, log_validacion)
 
     campos_salida = [c for c in mapeo if c is not None]
     encabezado = ["id", "anio", "periodo"] + campos_salida + ["archivo_origen"]
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    destino = output_path / nombre_salida
 
-    with open(nombre_salida, "w", encoding="utf-8", newline="") as f:
+    with destino.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=encabezado)
         writer.writeheader()
         writer.writerows(filas)
 
-    log_validacion.append(f"\n>>> {nombre_salida}: {len(filas)} filas totales, generado desde {os.path.basename(path)}.\n")
+    log_validacion.append(f"\n>>> {destino.name}: {len(filas)} filas totales, generado desde {os.path.basename(path)}.\n")
 
 
-def main():
+def copiar_descripciones(input_dir, output_dir, log_validacion):
+    origen = Path(input_dir) / "data_base_descriptions.csv"
+    if not origen.exists():
+        return None
+    destino = Path(output_dir) / "data_base_descriptions.csv"
+    destino.write_text(origen.read_text(encoding="utf-8"), encoding="utf-8")
+    log_validacion.append(f"\n>>> {destino.name}: copiado desde {origen.name}.\n")
+    return destino
+
+
+def run_processing(input_dir=".", output_dir="."):
     log_validacion = []
 
     log_validacion.append("=" * 70)
     log_validacion.append("EGRESOS")
     log_validacion.append("=" * 70)
-    consolidar(PATRON_EGRESOS, MAPEO_EGRESOS, "egr", "egresos_consolidado.csv", log_validacion)
+    consolidar(input_dir, PATRON_EGRESOS, MAPEO_EGRESOS, "egr", "egresos_consolidado.csv", log_validacion, output_dir)
 
     log_validacion.append("=" * 70)
     log_validacion.append("INGRESOS")
     log_validacion.append("=" * 70)
-    consolidar(PATRON_INGRESOS, MAPEO_INGRESOS, "ing", "ingresos_consolidado.csv", log_validacion)
+    consolidar(input_dir, PATRON_INGRESOS, MAPEO_INGRESOS, "ing", "ingresos_consolidado.csv", log_validacion, output_dir)
 
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    descriptions = copiar_descripciones(input_dir, output_dir, log_validacion)
     salida = "\n".join(log_validacion)
-    with open("validacion_consolidacion.txt", "w", encoding="utf-8") as f:
-        f.write(salida)
+    validacion = output_path / "validacion_consolidacion.txt"
+    validacion.write_text(salida, encoding="utf-8")
 
     print(salida)
     print("\n[OK] Generados: egresos_consolidado.csv, ingresos_consolidado.csv, validacion_consolidacion.txt")
+    return {
+        "egresos": str(output_path / "egresos_consolidado.csv"),
+        "ingresos": str(output_path / "ingresos_consolidado.csv"),
+        "validacion": str(validacion),
+        "descriptions": str(descriptions) if descriptions else None,
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Consolida los CSV de ingresos y egresos")
+    parser.add_argument("--input-dir", default=".", help="Directorio donde estan los CSV crudos")
+    parser.add_argument("--output-dir", default=".", help="Directorio donde se escriben los CSV consolidados")
+    args = parser.parse_args()
+    run_processing(input_dir=args.input_dir, output_dir=args.output_dir)
 
 
 if __name__ == "__main__":

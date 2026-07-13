@@ -11,3 +11,5 @@ __pycache__/
 tests/audio/artifacts/
 tests/artifacts/
 tests/full_system_test/artifacts/
+data/raw/
+data/processed/
