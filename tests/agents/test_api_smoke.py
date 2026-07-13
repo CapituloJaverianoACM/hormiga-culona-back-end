@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from types import MethodType
 
 from fastapi.testclient import TestClient
 
@@ -48,7 +49,7 @@ def _client_with_overrides(*, db_service=None, orchestrator=None) -> TestClient:
     if db_service is not None:
         main.app.dependency_overrides[AgentDatabaseService] = lambda: db_service
     if orchestrator is not None:
-        main.app.dependency_overrides[AgentOrchestratorService] = lambda: orchestrator
+        main.app.dependency_overrides[main.get_orchestrator_service] = lambda: orchestrator
     return TestClient(main.app)
 
 
@@ -93,3 +94,44 @@ def test_ui_endpoint_accepts_requests_without_sender_id():
     assert response.status_code == 200
     assert response.json()["sql"] == "SELECT 1"
     assert orchestrator.calls == [("Muéstrame gastos", 3)]
+
+
+def test_chat_endpoint_uses_query_agent_for_text_answers_without_sql_payload():
+    orchestrator = AgentOrchestratorService.__new__(AgentOrchestratorService)
+
+    async def _fake_query(self, content: str, chat_id: str) -> dict:
+        assert content == "hola en que puedes ayudarme?"
+        assert chat_id == "user-123"
+        return {
+            "agent_reply": "Hola. Puedo ayudarte con preguntas sobre los datos disponibles.",
+            "summary": "Puedo ayudarte con preguntas sobre datos disponibles",
+            "explanation": "Hola. Puedo ayudarte con preguntas sobre los datos disponibles.",
+            "voice_reply": "Hola. Puedo ayudarte con preguntas sobre los datos disponibles.",
+            "sql": "",
+            "columns": [],
+            "preview_rows": [],
+            "row_count": 0,
+        }
+
+    orchestrator._build_response_data_async = MethodType(_fake_query, orchestrator)
+    client = _client_with_overrides(orchestrator=orchestrator)
+
+    response = client.post(
+        "/agent/chat",
+        json={
+            "content": "hola en que puedes ayudarme?",
+            "sender_id": "user-123",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "agent_reply": "Hola. Puedo ayudarte con preguntas sobre los datos disponibles.",
+        "summary": "Puedo ayudarte con preguntas sobre datos disponibles",
+        "explanation": "Hola. Puedo ayudarte con preguntas sobre los datos disponibles.",
+        "voice_reply": "Hola. Puedo ayudarte con preguntas sobre los datos disponibles.",
+        "sql": "",
+        "columns": [],
+        "preview_rows": [],
+        "row_count": 0,
+    }

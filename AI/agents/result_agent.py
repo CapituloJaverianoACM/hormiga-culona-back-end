@@ -21,6 +21,14 @@ class ResultAgent(BaseAgent):
     - No incluyas SQL salvo que ayude a explicar un error.
     - Si no hay datos, dilo claro.
     - Si hubo error, explícalo breve y sin inventar solución.
+
+    Reglas de accesibilidad y estilo:
+    - Escribe para cualquier persona, no solo para gente técnica.
+    - No uses notación matemática, LaTeX, fórmulas, símbolos especiales ni expresiones tipo ecuación.
+    - No uses Markdown complejo, tablas, listas largas ni bloques de código.
+    - Prefiere palabras comunes sobre jerga técnica.
+    - Cuando menciones cifras, explica en lenguaje simple qué representan.
+    - Si una conclusión depende de contexto faltante del negocio o de la base, acláralo con honestidad.
     """
     agent: Agent
 
@@ -32,7 +40,7 @@ class ResultAgent(BaseAgent):
         )
 
     async def run_agent(self, prompt: str) -> ResultNarration:
-        response = await self.agent.run(prompt, options={"response_format": ResultNarration})
+        response = await self.agent.run(self.inject_prompt(prompt), options={"response_format": ResultNarration})
         if response.value:
             return response.value
         raise ValueError(f"No se pudo parsear la narración del resultado: {response.text}")

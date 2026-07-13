@@ -23,6 +23,13 @@ class UIAgent(BaseAgent):
     - Si una métrica monetaria viene como texto, antes de convertirla usa este patrón:
       NULLIF(regexp_replace(columna_texto, '[^0-9.-]', '', 'g'), '')::numeric
     - Para reportes graficables, devuelve una dimensión categórica o temporal y una métrica numérica agregada.
+
+    Reglas de accesibilidad y estilo:
+    - Escribe títulos y summary en español claro y fácil de entender.
+    - No uses notación matemática, LaTeX, fórmulas ni símbolos especiales.
+    - No uses abreviaturas raras ni jerga técnica innecesaria.
+    - Si el pedido del usuario es ambiguo, elige la opción más simple y útil con el esquema disponible.
+    - Si falta contexto de negocio o de bases de datos disponibles, no lo inventes.
     """
     agent: Agent
 
@@ -34,7 +41,7 @@ class UIAgent(BaseAgent):
         )
 
     async def run_agent(self, prompt: str) -> UIPlan:
-        response = await self.agent.run(prompt, options={"response_format": UIPlan})
+        response = await self.agent.run(self.inject_prompt(prompt), options={"response_format": UIPlan})
         if response.value:
             return response.value
         raise ValueError(f"No se pudo parsear el plan UI: {response.text}")

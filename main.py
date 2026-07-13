@@ -20,13 +20,23 @@ from services.schema import SchemaCacheService
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 schema_service = SchemaCacheService()
+orchestrator_service: AgentOrchestratorService | None = None
+
+
+def get_orchestrator_service() -> AgentOrchestratorService:
+    assert orchestrator_service is not None
+    return orchestrator_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """ Gestor del ciclo de vida del servidor (Startup / Shutdown) """
     
+    global orchestrator_service
+
     # 1. Ejecutamos la carga inicial inmediatamente antes de recibir tráfico
     schema_service.refresh_schema_sync()
+    orchestrator_service = AgentOrchestratorService()
+    await orchestrator_service.initialize()
     
     # 2. Configuramos y arrancamos el Cron Job
     scheduler = AsyncIOScheduler()
@@ -65,7 +75,7 @@ def healthMonitor():
 @app.post("/agent/chat")
 def chat(
     payload: MessagePayload, 
-    orchestrator: AgentOrchestratorService = Depends()
+    orchestrator: AgentOrchestratorService = Depends(get_orchestrator_service)
 ):
     resultado = orchestrator.processMessage(
         content=payload.content, 
@@ -103,7 +113,7 @@ def get_database_schema():
 @app.post("/agent/ui")
 def build_agent_ui(
     payload: UIRequestPayload,
-    orchestrator: AgentOrchestratorService = Depends()
+    orchestrator: AgentOrchestratorService = Depends(get_orchestrator_service)
 ):
     return orchestrator.build_ui_data(payload.content, payload.preview_limit)
 
@@ -111,7 +121,7 @@ def build_agent_ui(
 @app.post("/agent/audio/synthesis")
 def synthesize_audio(
     payload: SpeechSynthesisPayload,
-    orchestrator: AgentOrchestratorService = Depends(),
+    orchestrator: AgentOrchestratorService = Depends(get_orchestrator_service),
 ):
     audio_bytes = orchestrator.synthesize_audio(payload.text)
     return Response(content=audio_bytes, media_type="audio/wav")
@@ -120,7 +130,7 @@ def synthesize_audio(
 @app.post("/agent/audio/transcription")
 async def transcribe_audio(
     file: UploadFile = File(...),
-    orchestrator: AgentOrchestratorService = Depends(),
+    orchestrator: AgentOrchestratorService = Depends(get_orchestrator_service),
 ):
     audio_bytes = await file.read()
     return {
@@ -138,7 +148,7 @@ async def transcribe_audio(
 async def direct_voice_agent(
     websocket: WebSocket,
     session_id: str,
-    agent: AgentOrchestratorService = Depends()
+    agent: AgentOrchestratorService = Depends(get_orchestrator_service)
 ):
     await websocket.accept()
     print(f"Sesión de voz {session_id} iniciada.")
@@ -180,6 +190,7 @@ async def direct_voice_agent(
                     user_audio_bytes,
                     mode=mode,
                     preview_limit=preview_limit,
+                    chat_id=session_id,
                 )
             else:
                 result = await agent.process_text_request(

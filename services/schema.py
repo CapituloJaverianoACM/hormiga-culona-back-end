@@ -11,7 +11,8 @@ class SchemaCacheService:
             cls._instance.cache = {
                 "status": "initializing",
                 "database_name": "Base de datos abierta",
-                "schema": {}
+                "schema": {},
+                "table_descriptions": {},
             }
         return cls._instance
 
@@ -28,17 +29,22 @@ class SchemaCacheService:
         
         sql_query = """
             SELECT 
-                table_name AS "Tabla",
-                column_name AS "Columna", 
-                data_type AS "Tipo de Dato", 
-                is_nullable AS "Permite Nulos"
+                cols.table_name AS "Tabla",
+                cols.column_name AS "Columna", 
+                cols.data_type AS "Tipo de Dato", 
+                cols.is_nullable AS "Permite Nulos",
+                descs.description AS "Descripcion Tabla"
             FROM 
-                information_schema.columns
+                information_schema.columns AS cols
+            LEFT JOIN
+                public.data_base_descriptions AS descs
+                ON descs.data_base_name = cols.table_name
             WHERE 
-                table_schema = 'public'
+                cols.table_schema = 'public'
+                AND cols.table_name <> 'data_base_descriptions'
             ORDER BY 
-                table_name, 
-                ordinal_position;
+                cols.table_name, 
+                cols.ordinal_position;
         """
         
         try:
@@ -46,11 +52,16 @@ class SchemaCacheService:
             
             if isinstance(rows, list) and not (len(rows) > 0 and "error" in rows[0]):
                 formatted_schema = {}
+                table_descriptions = {}
                 
                 for row in rows:
                     t_name = row["Tabla"]
                     if t_name not in formatted_schema:
                         formatted_schema[t_name] = []
+
+                    table_description = row.get("Descripcion Tabla")
+                    if table_description:
+                        table_descriptions[t_name] = table_description
                         
                     formatted_schema[t_name].append({
                         "name": row["Columna"],
@@ -61,6 +72,7 @@ class SchemaCacheService:
                 # Sobrescritura atómica del estado
                 self.cache["status"] = "success"
                 self.cache["schema"] = formatted_schema
+                self.cache["table_descriptions"] = table_descriptions
                 print("[CRON] Caché actualizada exitosamente.")
             else:
                 print(f"[CRON-ERROR] Falló la consulta SQL: {rows}")
