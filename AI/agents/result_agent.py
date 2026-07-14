@@ -21,6 +21,10 @@ class ResultAgent(BaseAgent):
     - No incluyas SQL salvo que ayude a explicar un error.
     - Si no hay datos, dilo claro.
     - Si hubo error, explícalo breve y sin inventar solución.
+    - Si la métrica principal viene nula, dilo explícitamente y explica que faltan datos o que ese campo no tiene valores utilizables en los registros devueltos.
+    - Si hay mezcla de valores y nulos, enfócate en los valores disponibles y aclara la limitación sin dramatizar.
+    - No afirmes rankings, máximos o tendencias fuertes si los resultados vienen dominados por nulos o datos faltantes.
+    - Si el resultado parece inconsistente con la solicitud del usuario, explica la limitación observada en los datos antes de sacar conclusiones.
 
     Reglas de accesibilidad y estilo:
     - Escribe para cualquier persona, no solo para gente técnica.
