@@ -1,21 +1,18 @@
 from decimal import Decimal
 from pathlib import Path
+from types import MethodType
 
 import matplotlib.pyplot as plt
-from dotenv import load_dotenv
 from matplotlib.ticker import FuncFormatter
 
 from services.orchestrator import AgentOrchestratorService
-from services.schema import SchemaCacheService
-
-
-load_dotenv()
 
 
 """
-Made with AI for visualizing the output of the UI Agent. 
-It runs a test query and generates a chart from the results.
+Made with AI for visualizing the output of the UI Agent.
+Now tested without live DB or model calls.
 """
+
 
 def _pick_axes(rows: list[dict]) -> tuple[str, str]:
     if not rows:
@@ -37,10 +34,31 @@ def _pick_axes(rows: list[dict]) -> tuple[str, str]:
 
 
 def test_ui_agent_2017_expenses_report_generates_chart():
-    schema_service = SchemaCacheService()
-    schema_service.refresh_schema_sync()
+    orchestrator = AgentOrchestratorService.__new__(AgentOrchestratorService)
 
-    orchestrator = AgentOrchestratorService()
+    def _fake_build_ui_data(self, content: str, preview_limit: int = 5) -> dict:
+        assert "gastos" in content.lower()
+        assert preview_limit == 5
+        rows = [
+            {"anio": 2019, "total_gastos": 1_200_000_000_000},
+            {"anio": 2020, "total_gastos": 1_350_000_000_000},
+            {"anio": 2021, "total_gastos": 1_500_000_000_000},
+            {"anio": 2022, "total_gastos": 1_650_000_000_000},
+        ]
+        return {
+            "title": "Reporte de gastos por año",
+            "component": "line_chart",
+            "summary": "Gastos agregados por año.",
+            "explanation": "Los gastos crecen de forma sostenida entre 2019 y 2022.",
+            "voice_reply": "Preparé un reporte de gastos por año.",
+            "sql": "SELECT anio, SUM(total) AS total_gastos FROM egresos GROUP BY anio ORDER BY anio",
+            "columns": ["anio", "total_gastos"],
+            "preview_rows": rows[:preview_limit],
+            "rows": rows,
+            "row_count": len(rows),
+        }
+
+    orchestrator.build_ui_data = MethodType(_fake_build_ui_data, orchestrator)
     result = orchestrator.build_ui_data(
         "Haz un reporte de gastos de todos los años y devuélvelo listo para mostrar en frontend. Quiero poder graficarlo.",
         preview_limit=5,
