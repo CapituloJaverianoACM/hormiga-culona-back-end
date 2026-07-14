@@ -61,7 +61,7 @@ Memory   AudioService   ResponseService   UIService
    │        └── AzureSpeechSynthesisClient
    │
    ▼
-SchemaCacheService ──► AgentDatabaseService ──► SQLAlchemy engine ──► Supabase/Postgres
+Microsoft Agent Framework session managment
 ```
 
 ---
